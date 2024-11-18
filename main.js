@@ -9,15 +9,13 @@ wss.on('connection', function connection(ws) {
     ws.on('message', function message(data) {
         try { 
             data = JSON.parse(data);
-            if(id!=undefined) {data.id = id++; ws.send(JSON.stringify({ type: "init", id }));}else{
+            if(data.id!=undefined) {data.id = id++; ws.send(JSON.stringify({ type: "init", id }));return;}else{
             if (messages[data.id] == undefined) messages[data.id] = [];
              messages[data.id].push(data);
              ws.send(JSON.stringify({ type: "ack", messageNum: messages[data.id].length - 1 }));
             }
         } catch (e) { 
-            ws.send(JSON.stringify({ type: "err", error: e }));
+            ws.send(JSON.stringify({ type: "err", error: e.toString() }));
         }
     });
-
-
 });
