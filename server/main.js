@@ -1,21 +1,34 @@
 import { WebSocketServer } from 'ws';
-
-const wss = new WebSocketServer({ port: 8000 });
+import express from 'express';
+import http from 'http';
+import * as url from 'url';
+import path from 'path';
+const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
+const port=8000;
+const server=http.createServer()
+const wss = new WebSocketServer({server});
 let messages = [];
 let id = 0;
 let state={
     snakes:[],
     apples:[],
     keypresses:[],
-    score:[]
+    score:[],
+    screenDims:[],
+    running:false
 }
+let app = express();
+app.get('/', function(req, res) {;
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+});
+server.on('request', app);
 wss.on('connection', function connection(ws) {
     ws.on('error', console.error);
 
     ws.on('message', function message(data) {
         try { 
             data = JSON.parse(data);
-            if(data.id==undefined) {data.id = id++; ws.send(JSON.stringify({ type: "init", id }));return;}else{
+            if(data.id==undefined) {data.id = id++; ws.send(JSON.stringify({ type: "init", id,msdId:data.msgId }));return;}else{
             if (messages[data.id] == undefined) messages[data.id] = [];
              messages[data.id].push(data);
              ws.send(JSON.stringify(handleMessages(data.id)));
@@ -40,13 +53,9 @@ function handleMessages(id) {
         case "update":
             state.keypresses[id]=msg.data;
             break; 
-        case "loop":
-            state.snakes.forEach((v,id)=>updateSnake(id));
-            break;    
     }
-    console.log(state);
-    if(type==undefined) return { type: "ack",id }
-    return {type,id,data}
+    if(type==undefined) return { type: "ack",id,msgId:msg.msgId }
+    return {type,id,data,msgId:msg.msgId}
 }
 function updateSnake(id){
     let snake=state.snakes[id];
@@ -80,4 +89,14 @@ function initGame(playerCount,screenDims){
     for(let i=0;i<Math.floor(Math.random()*(playerCount*10));i++){
         state.apples[i]=[Math.floor(Math.random()*screenDims[0]),Math.floor(Math.random()*screenDims[1])];
     }
+    state.running=true;
+    state.screenDims=screenDims;
+    var loop=setInterval(()=>{
+        state.snakes.forEach((v,id)=>updateSnake(id));
+        if(apples.length==0)state.running=false;
+        if(!state.running)clearInterval(loop);
+    },16);
 }
+server.listen(port, function() {
+    console.log('Listening on http://localhost:' + port);
+})
