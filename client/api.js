@@ -1,25 +1,31 @@
 class API{
+    
     constructor(){
         this.url = 'wss://'+window.location.hostname;
         this.socket = new WebSocket(this.url);
-        this.isOpen=()=>new Promise((resolve,reject)=>{
-            if(this.socket.readyState===1){
-                resolve();
-            }
-        })
+        this.msgs={};
     }
+    isOpen(){
+        if(this.open)return;
+        return new Promise((resolve,reject)=>{
+        this.socket.onopen=()=>{this.open=true;resolve();}
+    })}
     async send(data){
         await this.isOpen();
-        data.msgId=Math.floor(Math.random() * 2^32);
+        data.msgId= Math.floor(Math.random() * (2^32 - 0 + 1)) + 0;
+        console.log("sending:",data);
         this.socket.send(JSON.stringify(data));
-        return await getMsg(data.msgId);
+        return await this.getMsg(data.msgId);
     }
     async getMsg(msgId){
         return new Promise((resolve,reject)=>{
+            this.msgs[msgId]=resolve;
             this.socket.onmessage=(e)=>{
                 let data = JSON.parse(e.data);
-                if(data.msgId===msgId){
-                    resolve(data);
+                console.log("received:",data, this.msgs,Object.keys(this.msgs).includes(data.msgId.toString()));
+                if(Object.keys(this.msgs).includes(data.msgId.toString())){
+                    
+                    this.msgs[data.msgId.toString()](data);
                 }
             }
         })
@@ -34,11 +40,13 @@ class API{
         if(msg.type!=="ack")throw new Error("Transmission error");
     }
     async getState(){
-        let msg=await this.send({type:"getState",id:this.id}).data;
-        let snakes;
-        let apples;
+        let msg=await this.send({type:"getState",id:this.id});
+        msg=msg.data;
+        let snakes=[];
+        let apples=[];
         msg.snakes.forEach((snake,i)=>{
-            snakes.push({score:msg.scores[i],body:snake});
+            if(msg.dead[i]==undefined)msg.dead[i]=false;
+            snakes.push({score:msg.score[i],body:snake,dead:msg.dead[i]});
         })
         msg.apples.forEach(apple=>{
             apples.push({x:apple[0],y:apple[1]});
@@ -50,4 +58,12 @@ class API{
         let msg=await this.send({type:"update",data:direction,id:id||this.id});
         if(msg.type!=="ack")throw new Error("Transmission error");
     }
+}
+function test(){
+    let api=new API();
+    api.init(2,100,100).then(async ()=>{
+        setInterval(async ()=>console.log((await api.getState()).snakes),1000);
+        
+    });
+
 }

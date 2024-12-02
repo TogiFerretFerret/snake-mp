@@ -15,26 +15,31 @@ let state={
     keypresses:[],
     score:[],
     screenDims:[],
-    running:false
+    running:false,
+    dead:[]
 }
 let app = express();
-app.get('/', function(req, res) {;
-    res.sendFile(path.join(__dirname, '../client/index.html'));
-});
+app.use(express.static('client'))
 server.on('request', app);
 wss.on('connection', function connection(ws) {
+    console.log("connected");
     ws.on('error', console.error);
 
     ws.on('message', function message(data) {
         try { 
             data = JSON.parse(data);
-            if(data.id==undefined) {data.id = id++; ws.send(JSON.stringify({ type: "init", id,msdId:data.msgId }));return;}else{
+            if(data.id==undefined) {data.id = id++; ws.send(JSON.stringify({ type: "init", id,msgId:data.msgId }));return;}else{
             if (messages[data.id] == undefined) messages[data.id] = [];
              messages[data.id].push(data);
-             ws.send(JSON.stringify(handleMessages(data.id)));
+             console.log("received:",data);
+             let msg=JSON.stringify(handleMessages(data.id));
+             ws.send(msg);
+             console.log("sent:",msg);
             }
         } catch (e) { 
-            ws.send(JSON.stringify({ type: "err", error: e.toString() }));
+            let msg=JSON.stringify({ type: "err", error: e.toString(),msgId:data.msgId });
+            ws.send(msg);
+            console.log("sent:",msg);
         }
     });
 });
@@ -76,9 +81,14 @@ function updateSnake(id){
             head=[1,0];
             break;
     }
-   console.log([state.snakes[id][0][0]+head[0],state.snakes[id][0][1]+head[1]],state.snakes[id],head,keypress);
-    state.snakes[id].unshift([state.snakes[id][0][0]+head[0],state.snakes[id][0][1]+head[1]]);
+   //console.log([state.snakes[id][0][0]+head[0],state.snakes[id][0][1]+head[1]],state.snakes[id],head,[[state.snakes[id][0][0]+head[0],state.snakes[id][0][1]+head[1]]].concat(state.snakes[id]));
+    state.snakes[id]=[[state.snakes[id][0][0]+head[0],state.snakes[id][0][1]+head[1]]].concat(state.snakes[id]);
     if(!state.apples.includes(state.snakes[id][0])){state.snakes[id].pop();}else{state.apples.splice(state.apples.indexOf(snakes[id][0]),1);state.score[id]++;}
+    state.snakes[id].forEach((i)=>{
+        state.snakes[id].forEach((j)=>{
+            if(i==j)state.dead[id]=true;
+        })
+    })
 }
 function initGame(playerCount,screenDims){
     for(let i=0;i<playerCount;i++){
@@ -93,9 +103,9 @@ function initGame(playerCount,screenDims){
     state.screenDims=screenDims;
     var loop=setInterval(()=>{
         state.snakes.forEach((v,id)=>updateSnake(id));
-        if(apples.length==0)state.running=false;
+        if(state.apples.length==0)state.running=false;
         if(!state.running)clearInterval(loop);
-    },16);
+    },2000);
 }
 server.listen(port, function() {
     console.log('Listening on http://localhost:' + port);

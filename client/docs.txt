@@ -1,0 +1,18 @@
+Snake:
+Struct Snake{
+    bool dead;
+    int score;
+    int[][] body;//body is a list of positions [x,y]
+}
+Apple:
+Struct Apple{
+    int x;
+    int y;
+}
+Direction:
+enum Direction{
+    up,
+    down,
+    left,
+    right
+}
